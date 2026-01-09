@@ -3,12 +3,24 @@ require_once 'db.php';
 
 $message = "";
 
+// -----------------------------------------
+// 1. 従業員リストを取得 (プルダウン用)
+// -----------------------------------------
+try {
+    $stmt = $pdo->query("SELECT id, name FROM jugyoin");
+    $jugyoin_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    echo "従業員データの取得に失敗: " . $e->getMessage();
+    exit;
+}
+
+// -----------------------------------------
+// 2. 退勤ボタンが押された時の処理
+// -----------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = $_POST['jugyoin_id'];
     if (!empty($id)) {
         try {
-            // 退勤記録をUPDATE（まだ退勤していない最新のレコードを更新）
-            // 条件: IDが一致 かつ end_work が NULL
             $sql = "UPDATE kiroku SET end_work = NOW() 
                     WHERE jugyoin_id = :id AND end_work IS NULL 
                     ORDER BY start_work DESC LIMIT 1";
@@ -17,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
 
             if ($stmt->rowCount() > 0) {
-                $message = "従業員ID: {$id} さんの退勤を記録しました。";
+                $message = "退勤を記録しました！ (ID: {$id})";
             } else {
                 $message = "エラー：出勤記録が見つからないか、既に退勤済みです。";
             }
@@ -50,8 +62,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="post" action="">
-            <p>従業員IDを入力してください:</p>
-            <input type="number" name="jugyoin_id" required placeholder="例: 101">
+            <p>氏名を選択してください:</p>
+
+            <select name="jugyoin_id" required style="width: 100%; padding: 10px; font-size: 16px; margin-bottom: 10px;">
+                <option value="">-- 選択してください --</option>
+                <?php foreach ($jugyoin_list as $employee): ?>
+                    <option value="<?= htmlspecialchars($employee['id']) ?>">
+                        <?= htmlspecialchars($employee['name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
             <button type="submit" class="btn-out">退勤する</button>
         </form>
     </div>
