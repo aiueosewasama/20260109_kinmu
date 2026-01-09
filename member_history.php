@@ -3,10 +3,32 @@ require_once 'db.php';
 
 // URLの ?id=xx から従業員IDを取得
 $id = $_GET['id'] ?? null;
+$message = ""; // 更新メッセージ用
 
 if (!$id) {
     echo "従業員IDが指定されていません。";
     exit;
+}
+
+// -----------------------------------------
+// 0. 時給変更ボタンが押された場合の処理 (POST)
+// -----------------------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_jikyu'])) {
+    $new_jikyu = (int)$_POST['new_jikyu'];
+    
+    if ($new_jikyu > 0) {
+        try {
+            $sql_update = "UPDATE jugyoin SET jikyu = :jikyu WHERE id = :id";
+            $stmt_update = $pdo->prepare($sql_update);
+            $stmt_update->bindValue(':jikyu', $new_jikyu, PDO::PARAM_INT);
+            $stmt_update->bindValue(':id', $id, PDO::PARAM_INT);
+            $stmt_update->execute();
+            
+            $message = "時給を {$new_jikyu}円 に変更しました！";
+        } catch (PDOException $e) {
+            $message = "更新エラー: " . $e->getMessage();
+        }
+    }
 }
 
 // -----------------------------------------
@@ -33,7 +55,6 @@ $stmt_log->bindValue(':id', $id, PDO::PARAM_INT);
 $stmt_log->execute();
 $logs = $stmt_log->fetchAll(PDO::FETCH_ASSOC);
 
-// 合計給料計算用
 $total_salary = 0;
 ?>
 <!DOCTYPE html>
@@ -43,21 +64,45 @@ $total_salary = 0;
     <title><?= htmlspecialchars($employee['name']) ?>さんの記録</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* 個人ページ専用のスタイル（薄い紫） */
         .page-member { background-color: #f3e5f5; border: 1px solid #e1bee7; }
         .page-member h1 { color: #8e24aa; }
         .info-box {
             background-color: #fff;
-            padding: 15px;
+            padding: 20px;
             border-radius: 8px;
             margin-bottom: 20px;
             border: 1px solid #ddd;
+            display: flex; /* 横並びにする */
+            justify-content: space-between;
+            align-items: center;
         }
         .total-salary {
-            font-size: 1.2em;
+            font-size: 1.4em;
             color: #d81b60;
             font-weight: bold;
         }
+        /* 更新フォームのデザイン */
+        .wage-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .wage-input {
+            padding: 5px;
+            font-size: 16px;
+            width: 80px;
+            text-align: right;
+        }
+        .btn-update {
+            background-color: #8e24aa;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-update:hover { background-color: #7b1fa2; }
+        .success-msg { color: #2e7d32; font-weight: bold; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -70,8 +115,20 @@ $total_salary = 0;
     <div class="container page-member">
         <h1><?= htmlspecialchars($employee['name']) ?> さんの記録</h1>
 
+        <?php if($message): ?>
+            <p class="success-msg"><?= htmlspecialchars($message) ?></p>
+        <?php endif; ?>
+
         <div class="info-box">
-            <p><strong>適用時給:</strong> <?= number_format($hourly_wage) ?> 円</p>
+            <div class="wage-section">
+                <form method="post" class="wage-form">
+                    <label>現在の時給:</label>
+                    <input type="number" name="new_jikyu" value="<?= $hourly_wage ?>" class="wage-input" required>
+                    <span>円</span>
+                    <button type="submit" class="btn-update">変更</button>
+                </form>
+                <small style="color:#666; display:block; margin-top:5px;">※変更すると過去の給料計算も全て新時給で再計算されます</small>
+            </div>
         </div>
         
         <table>
@@ -81,7 +138,7 @@ $total_salary = 0;
                     <th>出勤</th>
                     <th>退勤</th>
                     <th>時間</th>
-                    <th>給料</th>
+                    <th>給料 (<?= $hourly_wage ?>円計算)</th>
                 </tr>
             </thead>
             <tbody>
@@ -97,12 +154,11 @@ $total_salary = 0;
                             $seconds = $end - $start;
                             $hours = $seconds / 3600;
 
-                            // 給料計算 (時給 × 時間)
+                            // 現在設定されている時給で計算
                             $salary = floor($hours * $hourly_wage);
                             $salary_display = number_format($salary) . "円";
                             $duration_display = round($hours, 2) . "h";
 
-                            // 合計に加算
                             $total_salary += $salary;
                         }
                     ?>
@@ -117,8 +173,8 @@ $total_salary = 0;
             </tbody>
         </table>
 
-        <div class="info-box" style="margin-top: 20px; text-align: right;">
-            合計支給額: <span class="total-salary"><?= number_format($total_salary) ?> 円</span>
+        <div class="info-box" style="justify-content: flex-end;">
+            合計支給額: <span class="total-salary" style="margin-left: 10px;"><?= number_format($total_salary) ?> 円</span>
         </div>
     </div>
 </body>
