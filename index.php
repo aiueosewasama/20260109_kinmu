@@ -1,8 +1,15 @@
 <?php
 require_once 'db.php';
 
-// 全データを取得（新しい日付順）
-$sql = "SELECT * FROM kiroku ORDER BY start_work DESC";
+// ---------------------------------------------------
+// データを取得（テーブル結合）
+// ---------------------------------------------------
+// kirokuテーブル(k) と jugyoinテーブル(j) を結合します
+$sql = "SELECT k.*, j.name 
+        FROM kiroku k
+        JOIN jugyoin j ON k.jugyoin_id = j.id
+        ORDER BY k.start_work DESC";
+
 $stmt = $pdo->query($sql);
 $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -27,7 +34,7 @@ $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <table>
             <thead>
                 <tr>
-                    <th>従業員ID</th>
+                    <th>氏名</th>
                     <th>出勤時刻</th>
                     <th>退勤時刻</th>
                 </tr>
@@ -35,7 +42,8 @@ $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <tbody>
                 <?php foreach ($results as $row): ?>
                 <tr>
-                    <td><?= htmlspecialchars($row['jugyoin_id']) ?></td>
+                    <td><?= htmlspecialchars($row['name']) ?></td>
+                    
                     <td><?= htmlspecialchars($row['start_work']) ?></td>
                     <td><?= htmlspecialchars($row['end_work'] ?? '勤務中') ?></td>
                 </tr>
